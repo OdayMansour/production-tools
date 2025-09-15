@@ -273,12 +273,12 @@
 
 Hello __NAME__,
 
-Thank you for your interest in our __PRODUCT__. We're excited to offer you a special discount of __DISCOUNT__% off your first purchase.
+Thank you for your interest in our __PRODUCT__. We're **excited** to offer you a special discount of __DISCOUNT__% off your first purchase.
 
 Best regards,
 __SENDER__">Hello __NAME__,
 
-Thank you for your interest in our __PRODUCT__. We're excited to offer you a special discount of __DISCOUNT__% off your first purchase.
+Thank you for your interest in our __PRODUCT__. We're **excited** to offer you a special discount of __DISCOUNT__% off your first purchase.
 
 Best regards,
 __SENDER__</textarea>
@@ -368,7 +368,7 @@ Jane Smith	jane@email.com	Basic Plan	10	Marketing Team"></textarea>
         
         // Extract tokens from template
         function extractTokens(template) {
-            const tokenRegex = /__([A-Za-z0-9\-_]+)__/g;
+            const tokenRegex = /__([A-Za-z0-9\-_ ]+)__/g;
             const tokens = [];
             let match;
             
@@ -462,6 +462,20 @@ Jane Smith	jane@email.com	Basic Plan	10	Marketing Team"></textarea>
             }
         }
         
+        // Convert double asterisks to bold HTML and preserve line breaks
+        function formatBoldText(text) {
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+
+        // Convert double asterisks to bold HTML and preserve line breaks
+        function formatItalicText(text) {
+            return text
+                .replace(/\*(.*?)\*/g, '<i>$1</i>')
+                .replace(/\n/g, '<br>');
+        }
+        
         // Generate text from template
         function generateText() {
             const template = document.getElementById('template').value;
@@ -505,6 +519,9 @@ Jane Smith	jane@email.com	Basic Plan	10	Marketing Team"></textarea>
                         const regex = new RegExp(`__${token}__`, 'g');
                         result = result.replace(regex, row[token] || '');
                     });
+                    // Apply bold formatting to double asterisks
+                    result = formatBoldText(result);
+                    result = formatItalicText(result);
                     return {
                         index: index + 1,
                         text: result,
@@ -624,7 +641,20 @@ Jane Smith	jane@email.com	Basic Plan	10	Marketing Team"></textarea>
         // Copy to clipboard
         async function copyToClipboard(index) {
             try {
-                await navigator.clipboard.writeText(generatedResults[index].text);
+                // Create a temporary div to get both HTML and plain text
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = generatedResults[index].text;
+                const plainText = tempDiv.textContent || tempDiv.innerText || '';
+                const htmlText = generatedResults[index].text;
+                
+                // Copy both plain text and HTML to support rich text formatting
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        'text/html': new Blob([htmlText], { type: 'text/html' }),
+                        'text/plain': new Blob([plainText], { type: 'text/plain' })
+                    })
+                ]);
+                
                 // Visual feedback
                 const btn = event.target;
                 const originalText = btn.textContent;
@@ -633,15 +663,34 @@ Jane Smith	jane@email.com	Basic Plan	10	Marketing Team"></textarea>
                     btn.textContent = originalText;
                 }, 1500);
             } catch (error) {
-                console.error('Failed to copy: ', error);
+                // Fallback to plain text if rich text copying fails
+                try {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = generatedResults[index].text;
+                    const plainText = tempDiv.textContent || tempDiv.innerText || '';
+                    await navigator.clipboard.writeText(plainText);
+                    
+                    const btn = event.target;
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                    }, 1500);
+                } catch (fallbackError) {
+                    console.error('Failed to copy: ', fallbackError);
+                }
             }
         }
         
         // Download results
         function downloadResults() {
-            const content = generatedResults.map(result => 
-                `=== Result ${result.index} ===\n${result.text}\n`
-            ).join('\n');
+            const content = generatedResults.map(result => {
+                // Create a temporary div to extract plain text from HTML
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = result.text;
+                const plainText = tempDiv.textContent || tempDiv.innerText || '';
+                return `=== Result ${result.index} ===\n${plainText}\n`;
+            }).join('\n');
             
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
